@@ -29,4 +29,10 @@ describe('validateToken', () => {
   it('returns null for empty Bearer value', () => {
     expect(validateToken('Bearer ')).toBeNull();
   });
+
+  it('re-initialising with new tokens invalidates old tokens', () => {
+    initAuth({ carol: 'tok_carol_new' });
+    expect(validateToken('Bearer tok_alice_abc')).toBeNull();
+    expect(validateToken('Bearer tok_carol_new')).toBe('carol');
+  });
 });
