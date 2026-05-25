@@ -126,4 +126,26 @@ describe('render', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
   });
+
+  it('escapes HTML in no-results filter message', () => {
+    const html = render(emptyResult, { searchQuery: '<script>alert(1)</script>' });
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in error message', () => {
+    const html = render(emptyResult, {}, '<script>alert(1)</script>');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('renders TrustIQ grey badge for score of 1', () => {
+    const result: SearchResult = {
+      suppliers: [{ ...baseSupplier, TrustIQ: 1 }],
+      totalCount: 1,
+    };
+    const html = render(result, {});
+    expect(html).toContain('badge-grey');
+    expect(html).toContain('TrustIQ: 1/5');
+  });
 });

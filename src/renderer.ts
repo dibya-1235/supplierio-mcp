@@ -121,7 +121,7 @@ export function render(result: SearchResult, params: SearchParams, errorMessage?
       params.diversityClassification ? `classification ${params.diversityClassification}` : null,
       params.naicsCode ? `NAICS ${params.naicsCode}` : null,
     ].filter((f): f is string => f !== null).join(', ');
-    return wrapPage(`<div class="no-results"><h3>No Suppliers Found</h3><p>No results matched your search${filters ? ` for ${filters}` : ''}. Try broadening your filters.</p></div>`);
+    return wrapPage(`<div class="no-results"><h3>No Suppliers Found</h3><p>No results matched your search${filters ? ` for ${esc(filters)}` : ''}. Try broadening your filters.</p></div>`);
   }
 
   const summary = renderSummary(params, result.totalCount, result.suppliers.length);
