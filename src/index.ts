@@ -35,6 +35,15 @@ function createMcpServer(): McpServer {
   return server;
 }
 
+// --- Express error handling ---
+function asyncHandler(
+  fn: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>
+): express.RequestHandler {
+  return (req, res, next) => {
+    fn(req, res, next).catch(next);
+  };
+}
+
 // --- Express ---
 const app = express();
 app.use(express.json());
@@ -50,7 +59,7 @@ app.use('/mcp', (req, res, next) => {
 });
 
 // MCP endpoint
-app.post('/mcp', async (req, res) => {
+app.post('/mcp', asyncHandler(async (req, res) => {
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
   if (sessionId) {
@@ -80,7 +89,7 @@ app.post('/mcp', async (req, res) => {
   const mcpServer = createMcpServer();
   await mcpServer.connect(transport);
   await transport.handleRequest(req, res, req.body);
-});
+}));
 
 // Health check (no auth)
 app.get('/health', (_req, res) => {
@@ -88,13 +97,21 @@ app.get('/health', (_req, res) => {
 });
 
 // Admin logs (ADMIN_TOKEN required)
-app.get('/admin/logs', async (req, res) => {
+app.get('/admin/logs', asyncHandler(async (req, res) => {
   if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN!}`) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }
   const entries = await readLastN(100);
   res.json(entries);
+}));
+
+// Error handler — catches errors from async routes
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled route error:', err.message);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Start
