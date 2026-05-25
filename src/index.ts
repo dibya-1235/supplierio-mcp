@@ -3,11 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { initAuth, validateToken } from './auth.js';
+import { initUsers, hashPassword } from './users.js';
+import { registerOAuthRoutes, validateOAuthToken } from './oauthServer.js';
+import { asyncHandler } from './asyncHandler.js';
 import { readLastN } from './logger.js';
 import { usernameStorage } from './context.js';
 import { registerTools } from './tools/searchSuppliers.js';
 
 // --- Startup validation ---
+
 const rawTokens = process.env.VALID_TOKENS;
 if (!rawTokens) {
   console.error('FATAL: VALID_TOKENS env var is required');
@@ -20,6 +24,13 @@ try {
   process.exit(1);
 }
 
+const rawUsers = process.env.USERS;
+if (!rawUsers) {
+  console.error('FATAL: USERS env var is required — e.g. {"dibya@supplier.io":"$2b$10$..."}');
+  process.exit(1);
+}
+initUsers(rawUsers); // exits on invalid JSON internally
+
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 if (!ADMIN_TOKEN) {
   console.error('FATAL: ADMIN_TOKEN env var is required');
@@ -27,6 +38,7 @@ if (!ADMIN_TOKEN) {
 }
 
 // --- Session management ---
+
 const transports = new Map<string, StreamableHTTPServerTransport>();
 
 function createMcpServer(): McpServer {
@@ -35,22 +47,21 @@ function createMcpServer(): McpServer {
   return server;
 }
 
-// --- Express error handling ---
-function asyncHandler(
-  fn: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>
-): express.RequestHandler {
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-}
+// --- Express setup ---
 
-// --- Express ---
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // needed for OAuth form submissions
+
+// OAuth routes are public (no auth middleware) — must be registered before auth middleware
+registerOAuthRoutes(app);
 
 // Auth middleware — runs before all /mcp requests
+// Accepts both VALID_TOKENS bearer tokens (legacy) and OAuth access tokens
 app.use('/mcp', (req, res, next) => {
-  const username = validateToken(req.headers.authorization);
+  const username =
+    validateToken(req.headers.authorization) ??
+    validateOAuthToken(req.headers.authorization);
   if (!username) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
@@ -106,7 +117,24 @@ app.get('/admin/logs', asyncHandler(async (req, res) => {
   res.json(entries);
 }));
 
-// Error handler — catches errors from async routes
+// Admin: hash a password for adding to the USERS env var
+// Usage: GET /admin/generate-hash?password=chosen_password
+//        Authorization: Bearer <ADMIN_TOKEN>
+app.get('/admin/generate-hash', asyncHandler(async (req, res) => {
+  if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN!}`) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  const password = req.query.password as string | undefined;
+  if (!password) {
+    res.status(400).json({ error: 'password query param required' });
+    return;
+  }
+  const hash = await hashPassword(password);
+  res.json({ hash });
+}));
+
+// Error handler — catches errors thrown in async routes
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled route error:', err.message);
   if (!res.headersSent) {
