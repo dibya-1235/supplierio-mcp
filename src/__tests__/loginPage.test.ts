@@ -75,4 +75,18 @@ describe('renderLoginPage', () => {
     expect(html).not.toContain('<b>bad</b>');
     expect(html).toContain('&lt;b&gt;bad&lt;/b&gt;');
   });
+
+  it('XSS-escapes the redirectUri parameter', () => {
+    const xssParams = { ...params, redirectUri: 'https://evil.com/"onmouseover="alert(1)' };
+    const html = renderLoginPage(xssParams);
+    expect(html).not.toContain('"onmouseover=');
+    expect(html).toContain('&quot;onmouseover=');
+  });
+
+  it('XSS-escapes the codeChallenge parameter', () => {
+    const xssParams = { ...params, codeChallenge: '"><img src=x onerror=alert(1)>' };
+    const html = renderLoginPage(xssParams);
+    expect(html).not.toContain('"><img');
+    expect(html).toContain('&quot;&gt;&lt;img');
+  });
 });
