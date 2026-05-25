@@ -63,6 +63,7 @@ app.use('/mcp', (req, res, next) => {
     validateToken(req.headers.authorization) ??
     validateOAuthToken(req.headers.authorization);
   if (!username) {
+    res.set('WWW-Authenticate', 'Bearer realm="supplierio-mcp"');
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
