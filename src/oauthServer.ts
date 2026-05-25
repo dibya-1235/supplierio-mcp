@@ -90,6 +90,19 @@ export function registerOAuthRoutes(app: express.Application): void {
       return;
     }
 
+    // Validate redirect_uri: must be HTTPS and must be from an allowed host
+    let parsedRedirect: URL;
+    try {
+      parsedRedirect = new URL(params.redirectUri);
+    } catch {
+      res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is not a valid URL' });
+      return;
+    }
+    if (parsedRedirect.protocol !== 'https:' || !['claude.ai'].includes(parsedRedirect.hostname)) {
+      res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not permitted' });
+      return;
+    }
+
     const valid = await verifyUser(body.email ?? '', body.password ?? '');
     if (!valid) {
       res.send(renderLoginPage(params, 'Invalid email or password'));
@@ -104,7 +117,7 @@ export function registerOAuthRoutes(app: express.Application): void {
       expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
     });
 
-    const redirectUrl = new URL(params.redirectUri);
+    const redirectUrl = parsedRedirect;
     redirectUrl.searchParams.set('code', code);
     redirectUrl.searchParams.set('state', params.state);
     res.redirect(redirectUrl.toString());
@@ -156,4 +169,13 @@ export function registerOAuthRoutes(app: express.Application): void {
       expires_in: 7776000, // 90 days in seconds
     });
   }));
+
+  // Proactively purge expired auth codes every minute
+  // (Access tokens are cleaned up lazily in validateOAuthToken)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [code, entry] of authCodes) {
+      if (now > entry.expiresAt) authCodes.delete(code);
+    }
+  }, 60_000);
 }
