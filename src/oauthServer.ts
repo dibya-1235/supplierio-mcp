@@ -49,6 +49,16 @@ export function _injectAccessToken(token: string, email: string, expiresAt: numb
 }
 
 export function registerOAuthRoutes(app: express.Application): void {
+  // 0. Protected Resource Metadata (RFC 9728) — MCP spec requires this as the
+  //    first discovery step. Claude.ai reads WWW-Authenticate → fetches this →
+  //    finds the authorization server → fetches /.well-known/oauth-authorization-server
+  app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+    res.json({
+      resource: `${BASE_URL}/mcp`,
+      authorization_servers: [BASE_URL],
+    });
+  });
+
   // 1. OAuth server metadata (RFC 8414) — Claude.ai uses this for discovery
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
     res.json({

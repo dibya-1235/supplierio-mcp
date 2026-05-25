@@ -63,7 +63,8 @@ app.use('/mcp', (req, res, next) => {
     validateToken(req.headers.authorization) ??
     validateOAuthToken(req.headers.authorization);
   if (!username) {
-    res.set('WWW-Authenticate', 'Bearer realm="supplierio-mcp"');
+    const baseUrl = process.env.BASE_URL ?? 'https://supplierio-mcp.onrender.com';
+    res.set('WWW-Authenticate', `Bearer realm="supplierio-mcp", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`);
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
