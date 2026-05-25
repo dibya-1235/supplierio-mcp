@@ -40,7 +40,7 @@ describe('users', () => {
   it('initUsers calls process.exit(1) on invalid JSON', () => {
     const exitSpy = vi
       .spyOn(process, 'exit')
-      .mockImplementation((() => {}) as unknown as (code?: number) => never);
+      .mockImplementation((() => {}) as unknown as (code?: number | string | null) => never);
     initUsers('not-valid-json');
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
