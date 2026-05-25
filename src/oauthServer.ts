@@ -62,6 +62,7 @@ export function registerOAuthRoutes(app: express.Application): void {
   //    finds the authorization server → fetches /.well-known/oauth-authorization-server
   app.get('/.well-known/oauth-protected-resource', (_req, res) => {
     setCorsHeaders(res);
+    res.set('X-Cors-Version', 'v2'); // diagnostic header — remove after confirming CORS works
     res.json({
       resource: `${BASE_URL}/mcp`,
       authorization_servers: [BASE_URL],
