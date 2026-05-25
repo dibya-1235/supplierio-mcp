@@ -5,6 +5,8 @@ export default defineConfig({
     environment: 'node',
   },
   resolve: {
-    extensions: ['.ts', '.js'],
+    alias: [
+      { find: /^(\.{1,2}\/.*)\.js$/, replacement: '$1' },
+    ],
   },
 });
