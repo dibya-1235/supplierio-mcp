@@ -60,10 +60,13 @@ describe('logger', () => {
     expect(entries).toEqual([]);
   });
 
-  it('log() does not throw when the log directory does not exist', async () => {
-    const { log } = await import('../logger.js');
-    await expect(
-      log({ timestamp: 'ts', username: 'u', tool: 't', params: {}, resultCount: 0, latencyMs: 0 })
-    ).resolves.not.toThrow();
+  it('log() creates the log directory if it does not exist', async () => {
+    const { log, readLastN } = await import('../logger.js');
+    const subLogPath = join(tmpDir, 'nonexistent-sub', 'usage.log');
+    vi.stubEnv('LOG_PATH', subLogPath);
+    await log({ timestamp: 'ts', username: 'u', tool: 't', params: {}, resultCount: 0, latencyMs: 0 });
+    const entries = await readLastN(10);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].username).toBe('u');
   });
 });

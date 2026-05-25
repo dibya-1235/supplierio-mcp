@@ -25,10 +25,19 @@ export async function log(entry: LogEntry): Promise<void> {
 }
 
 export async function readLastN(n: number): Promise<LogEntry[]> {
+  if (n <= 0) return [];
   try {
     const content = await readFile(getLogPath(), 'utf8');
     const lines = content.trim().split('\n').filter(Boolean);
-    return lines.slice(-n).map((line) => JSON.parse(line) as LogEntry);
+    return lines
+      .slice(-n)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line) as LogEntry];
+        } catch {
+          return [];
+        }
+      });
   } catch {
     return [];
   }
