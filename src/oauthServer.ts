@@ -48,11 +48,20 @@ export function _injectAccessToken(token: string, email: string, expiresAt: numb
   accessTokens.set(token, { email, expiresAt });
 }
 
+// CORS headers required on endpoints that claude.ai browser code fetches cross-origin.
+// Without these the browser silently discards responses (Same-Origin Policy).
+function setCorsHeaders(res: express.Response): void {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, MCP-Session-Id');
+}
+
 export function registerOAuthRoutes(app: express.Application): void {
   // 0. Protected Resource Metadata (RFC 9728) — MCP spec requires this as the
   //    first discovery step. Claude.ai reads WWW-Authenticate → fetches this →
   //    finds the authorization server → fetches /.well-known/oauth-authorization-server
   app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+    setCorsHeaders(res);
     res.json({
       resource: `${BASE_URL}/mcp`,
       authorization_servers: [BASE_URL],
@@ -61,6 +70,7 @@ export function registerOAuthRoutes(app: express.Application): void {
 
   // 1. OAuth server metadata (RFC 8414) — Claude.ai uses this for discovery
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
+    setCorsHeaders(res);
     res.json({
       issuer: BASE_URL,
       authorization_endpoint: `${BASE_URL}/oauth/authorize`,
@@ -133,8 +143,16 @@ export function registerOAuthRoutes(app: express.Application): void {
     res.redirect(redirectUrl.toString());
   }));
 
+  // Preflight handler — browsers send OPTIONS before cross-origin POST requests.
+  // Without this, the token exchange fetch is blocked before it starts.
+  app.options('/oauth/token', (_req, res) => {
+    setCorsHeaders(res);
+    res.sendStatus(204);
+  });
+
   // 4. Token exchange — Claude.ai sends code + PKCE verifier, gets access token
   app.post('/oauth/token', asyncHandler(async (req, res) => {
+    setCorsHeaders(res);
     const body = req.body as Record<string, string>;
     const code = body.code;
     const codeVerifier = body.code_verifier;

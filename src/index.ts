@@ -59,6 +59,18 @@ registerOAuthRoutes(app);
 // Auth middleware — runs before all /mcp requests
 // Accepts both VALID_TOKENS bearer tokens (legacy) and OAuth access tokens
 app.use('/mcp', (req, res, next) => {
+  // CORS: claude.ai browser code must be able to read the 401 response to
+  // extract the WWW-Authenticate header and begin the OAuth discovery chain.
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, MCP-Session-Id');
+
+  // Handle preflight for /mcp
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+
   const username =
     validateToken(req.headers.authorization) ??
     validateOAuthToken(req.headers.authorization);
