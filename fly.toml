@@ -2,7 +2,7 @@ app = "supplierio-mcp"
 primary_region = "iad"
 
 [env]
-  LOG_PATH = "/app/logs/usage.log"
+  LOG_PATH = "/tmp/usage.log"
   PORT = "8080"
 
 [http_service]
@@ -18,4 +18,4 @@ primary_region = "iad"
 
 [[mounts]]
   source = "logs_vol"
-  destination = "/app/logs"
+  destination = "/tmp/logs"

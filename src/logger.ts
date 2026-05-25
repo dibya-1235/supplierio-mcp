@@ -11,7 +11,7 @@ export interface LogEntry {
 }
 
 function getLogPath(): string {
-  return process.env.LOG_PATH ?? '/app/logs/usage.log';
+  return process.env.LOG_PATH ?? '/tmp/usage.log';
 }
 
 export async function log(entry: LogEntry): Promise<void> {
