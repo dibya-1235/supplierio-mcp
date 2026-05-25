@@ -22,6 +22,7 @@ const inputSchema = {
   diversityClassification: z.string().optional().describe('e.g. "MBE", "WBE", "VOSB", "LGBTQ"'),
   employee: z.string().optional().describe('Employee range, e.g. "51-200"'),
   revenue: z.string().optional().describe('Revenue range, e.g. "$1M-10M"'),
+  // .default('USA') means args.country is always a string — supplierioClient's own ?? 'USA' fallback is intentional defense-in-depth
   country: z.string().optional().default('USA').describe('ISO 3-letter country code, default "USA"'),
 };
 
@@ -46,8 +47,9 @@ export function registerTools(server: McpServer): void {
     try {
       result = await doSearch(params);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
       errorMessage =
-        (err as Error).message === 'TIMEOUT'
+        msg === 'TIMEOUT'
           ? 'The supplier search timed out. Please try again.'
           : 'The supplier search is temporarily unavailable. Please try again later.';
     }

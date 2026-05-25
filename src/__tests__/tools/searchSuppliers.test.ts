@@ -19,8 +19,9 @@ import { render as mockRender } from '../../renderer.js';
 import { log as mockLog } from '../../logger.js';
 import { registerTools } from '../../tools/searchSuppliers.js';
 
-// Helper to get the registered tool handler
-// NOTE: In @modelcontextprotocol/sdk v1.x, _registeredTools is a plain object (not a Map)
+// Helper to access tool handlers via SDK internal structure.
+// In @modelcontextprotocol/sdk v1.12.x, _registeredTools is a plain object (not a Map).
+// If tests start failing with "tool is undefined", inspect McpServer internals on the new SDK version.
 type RegisteredTools = Record<string, { handler: (args: unknown) => Promise<unknown> }>;
 
 function getTool(server: McpServer, name: string) {
