@@ -88,4 +88,25 @@ describe('searchSuppliers', () => {
     const { searchSuppliers } = await import('../supplierioClient.js');
     await expect(searchSuppliers({})).rejects.toThrow('not configured');
   });
+
+  it('uses caller-supplied country instead of USA default', async () => {
+    let capturedBody: Record<string, unknown> = {};
+    vi.spyOn(global, 'fetch').mockImplementationOnce(async (_url, init) => {
+      capturedBody = JSON.parse(init?.body as string) as Record<string, unknown>;
+      return new Response(JSON.stringify({ suppliers: [], totalCount: 0 }), { status: 200 });
+    });
+    const { searchSuppliers } = await import('../supplierioClient.js');
+    await searchSuppliers({ country: 'CAN' });
+    expect(capturedBody.country).toBe('CAN');
+  });
+
+  it('returns empty suppliers and zero totalCount on empty API response', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({}), { status: 200 })
+    );
+    const { searchSuppliers } = await import('../supplierioClient.js');
+    const result = await searchSuppliers({});
+    expect(result.suppliers).toEqual([]);
+    expect(result.totalCount).toBe(0);
+  });
 });
