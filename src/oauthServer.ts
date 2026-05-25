@@ -66,6 +66,7 @@ export function registerOAuthRoutes(app: express.Application): void {
     res.json({
       resource: `${BASE_URL}/mcp`,
       authorization_servers: [BASE_URL],
+      _build: 'cors-v2', // diagnostic field — remove after confirming new code is deployed
     });
   });
 
