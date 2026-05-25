@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import express from 'express';
 import { verifyUser } from './users.js';
 import { renderLoginPage, type LoginPageParams } from './loginPage.js';
+import { asyncHandler } from './asyncHandler.js';
 
 // --- In-memory stores ---
 
@@ -21,16 +22,6 @@ const authCodes = new Map<string, AuthCode>();
 const accessTokens = new Map<string, AccessToken>();
 
 const BASE_URL = process.env.BASE_URL ?? 'https://supplierio-mcp.onrender.com';
-
-// --- Helpers ---
-
-function asyncHandler(
-  fn: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>
-): express.RequestHandler {
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-}
 
 // --- Public API ---
 
@@ -120,7 +111,7 @@ export function registerOAuthRoutes(app: express.Application): void {
   }));
 
   // 4. Token exchange — Claude.ai sends code + PKCE verifier, gets access token
-  app.post('/oauth/token', (req, res) => {
+  app.post('/oauth/token', asyncHandler(async (req, res) => {
     const body = req.body as Record<string, string>;
     const code = body.code;
     const codeVerifier = body.code_verifier;
@@ -164,5 +155,5 @@ export function registerOAuthRoutes(app: express.Application): void {
       token_type: 'Bearer',
       expires_in: 7776000, // 90 days in seconds
     });
-  });
+  }));
 }
