@@ -40,14 +40,11 @@ const TIMEOUT_MS = 5000;
 export async function searchSuppliers(params: SearchParams): Promise<SearchResult> {
   const apiKey = process.env.SUPPLIERIO_API_KEY;
   const customerId = process.env.SUPPLIERIO_CUSTOMER_ID;
+  const customerName = process.env.SUPPLIERIO_CUSTOMER_NAME;
 
-  if (!apiKey || !customerId) {
+  if (!apiKey || !customerId || !customerName) {
     throw new Error('Supplier search is not configured. Please contact your administrator.');
   }
-
-  // Diagnostic: log length and boundary chars to catch extra quotes/spaces without exposing secrets
-  console.log(`[SupplierIO] apiKey len=${apiKey.length} first=${JSON.stringify(apiKey[0])} last=${JSON.stringify(apiKey[apiKey.length-1])}`);
-  console.log(`[SupplierIO] customerId len=${customerId.length} first=${JSON.stringify(customerId[0])} last=${JSON.stringify(customerId[customerId.length-1])}`);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -56,6 +53,7 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
     const body: Record<string, unknown> = {
       apiKey,
       customerId: Number(customerId), // API expects integer, env vars are always strings
+      customerName,
       rowCount: 10,
       startRecord: 0,
       country: params.country ?? 'USA',
