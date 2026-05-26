@@ -71,10 +71,13 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
     });
 
     if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error(`[SupplierIO] API error ${response.status}: ${body.slice(0, 300)}`);
       throw new Error(`API_ERROR:${response.status}`);
     }
 
     const data = await response.json() as { suppliers?: Supplier[]; totalCount?: number };
+    console.log(`[SupplierIO] OK totalCount=${data.totalCount ?? 0} suppliers=${(data.suppliers ?? []).length}`);
     return {
       suppliers: data.suppliers ?? [],
       totalCount: data.totalCount ?? 0,
