@@ -53,6 +53,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false })); // needed for OAuth form submissions
 
+// Global request logger — logs every inbound request so we can see what claude.ai sends
+app.use((req, _res, next) => {
+  const auth = req.headers.authorization
+    ? req.headers.authorization.startsWith('Bearer ') ? 'Bearer ***' : 'other'
+    : 'none';
+  const ua = (req.headers['user-agent'] ?? '').slice(0, 80);
+  console.log(`[REQ] ${req.method} ${req.path} | auth=${auth} | origin=${req.headers.origin ?? '-'} | ua=${ua}`);
+  next();
+});
+
 // OAuth routes are public (no auth middleware) — must be registered before auth middleware
 registerOAuthRoutes(app);
 
