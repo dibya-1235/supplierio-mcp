@@ -55,7 +55,7 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
   try {
     const body: Record<string, unknown> = {
       apiKey,
-      customerId,
+      customerId: Number(customerId), // API expects integer, env vars are always strings
       rowCount: 10,
       startRecord: 0,
       country: params.country ?? 'USA',
