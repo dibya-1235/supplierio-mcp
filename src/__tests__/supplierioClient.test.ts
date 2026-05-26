@@ -18,6 +18,7 @@ describe('searchSuppliers', () => {
     vi.resetModules();
     vi.stubEnv('SUPPLIERIO_API_KEY', 'test_key');
     vi.stubEnv('SUPPLIERIO_CUSTOMER_ID', 'test_cust');
+    vi.stubEnv('SUPPLIERIO_CUSTOMER_NAME', 'Test Customer');
   });
 
   afterEach(() => {

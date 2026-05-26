@@ -12,6 +12,8 @@ const baseSupplier = {
   Zip: '78701',
   Country: 'USA',
   TrustIQ: 5,
+  Diversity: null,
+  Sustainability: null,
   Relationships: null,
 };
 

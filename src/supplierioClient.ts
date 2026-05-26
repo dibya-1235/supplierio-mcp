@@ -1,3 +1,12 @@
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export interface CertificationDetail {
+  Classification: string | null;
+  Agency: string | null;
+  ExpirationDate: string | null;
+  CertificateNumber: string | null;
+}
+
 export interface Supplier {
   SupplierID: string;
   SupplierName: string;
@@ -8,6 +17,8 @@ export interface Supplier {
   Zip: string | null;
   Country: string | null;
   TrustIQ: number | null;
+  Diversity: string[] | null;
+  Sustainability: string[] | null;
   Relationships: {
     ParentName: string | null;
     ParentAddress: string | null;
@@ -25,17 +36,31 @@ export interface SearchResult {
 }
 
 export interface SearchParams {
+  // Keyword / name
   searchQuery?: string;
+  organizationName?: string;        // filter by exact/partial supplier name
+  // Geography
   state?: string;
+  country?: string;
+  // Industry
   naicsCode?: string;
+  sicCode?: string;
+  // Diversity & sustainability
   diversityClassification?: string;
+  sustainabilityClassification?: string;
+  ethnicity?: string;
+  // Size
   employee?: string;
   revenue?: string;
-  country?: string;
 }
 
-const ENDPOINT = 'https://api.supplier.io/supplier/GetSearchDetail';
-const TIMEOUT_MS = 5000;
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const BASE_URL = process.env.SUPPLIERIO_BASE_URL ?? 'https://api.supplier.io/supplier';
+const ENDPOINT = `${BASE_URL}/GetSearchDetail`;
+const TIMEOUT_MS = 10000;
+
+// ── Client ────────────────────────────────────────────────────────────────────
 
 export async function searchSuppliers(params: SearchParams): Promise<SearchResult> {
   const apiKey = process.env.SUPPLIERIO_API_KEY;
@@ -52,21 +77,34 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
   try {
     const body: Record<string, unknown> = {
       apiKey,
-      customerId: Number(customerId), // API expects integer, env vars are always strings
+      customerId,
       customerName,
       rowCount: 10,
       startRecord: 0,
       country: params.country ?? 'USA',
+      // Enable all enrichment flags so responses include relationships,
+      // sustainability data, and small-business classifications
+      enableRelationships: true,
+      enableDiverse: true,
+      enableSustainable: true,
+      enableSIOIdentifiedSmall: true,
     };
-    if (params.searchQuery) body.searchQuery = params.searchQuery;
-    if (params.state) body.state = params.state;
-    if (params.naicsCode) body.naicsCode = params.naicsCode;
-    if (params.diversityClassification) body.diversityClassification = params.diversityClassification;
-    if (params.employee) body.employee = params.employee;
-    if (params.revenue) body.revenue = params.revenue;
+
+    // Only include optional fields if provided — omitting keeps API defaults
+    if (params.searchQuery)               body.searchQuery = params.searchQuery;
+    if (params.organizationName)          body.organizationName = params.organizationName;
+    if (params.state)                     body.state = params.state;
+    if (params.naicsCode)                 body.naicsCode = params.naicsCode;
+    if (params.sicCode)                   body.sicCode = params.sicCode;
+    if (params.diversityClassification)   body.diversityClassification = params.diversityClassification;
+    if (params.sustainabilityClassification) body.sustainabilityClassification = params.sustainabilityClassification;
+    if (params.ethnicity)                 body.ethnicity = params.ethnicity;
+    if (params.employee)                  body.employee = params.employee;
+    if (params.revenue)                   body.revenue = params.revenue;
 
     const bodyJson = JSON.stringify(body);
-    console.log(`[SupplierIO] sending to ${ENDPOINT}: ${bodyJson.replace(/"apiKey":"[^"]*"/, '"apiKey":"***"')}`);
+    console.log(`[SupplierIO] POST ${ENDPOINT}: ${bodyJson.replace(/"apiKey":"[^"]*"/, '"apiKey":"***"')}`);
+
     const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,8 +113,8 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      console.error(`[SupplierIO] API error ${response.status}: ${body.slice(0, 300)}`);
+      const text = await response.text().catch(() => '');
+      console.error(`[SupplierIO] error ${response.status}: ${text.slice(0, 300)}`);
       throw new Error(`API_ERROR:${response.status}`);
     }
 
@@ -87,9 +125,7 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
       totalCount: data.totalCount ?? 0,
     };
   } catch (err) {
-    if ((err as Error).name === 'AbortError') {
-      throw new Error('TIMEOUT');
-    }
+    if ((err as Error).name === 'AbortError') throw new Error('TIMEOUT');
     throw err;
   } finally {
     clearTimeout(timer);
