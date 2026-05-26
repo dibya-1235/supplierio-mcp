@@ -47,11 +47,18 @@ export function registerTools(server: McpServer): void {
     try {
       result = await doSearch(params);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      errorMessage =
-        msg === 'TIMEOUT'
-          ? 'The supplier search timed out. Please try again.'
-          : 'The supplier search is temporarily unavailable. Please try again later.';
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[search_suppliers] error for user=${username}: ${msg}`);
+      if (msg === 'TIMEOUT') {
+        errorMessage = 'The supplier search timed out. Please try again.';
+      } else if (msg.startsWith('API_ERROR:')) {
+        const status = msg.split(':')[1];
+        errorMessage = `The supplier search returned an unexpected error (status ${status}). Please try again later.`;
+      } else if (msg === 'Supplier search is not configured. Please contact your administrator.') {
+        errorMessage = msg;
+      } else {
+        errorMessage = 'The supplier search is temporarily unavailable. Please try again later.';
+      }
     }
 
     const latencyMs = Date.now() - startMs;
