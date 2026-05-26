@@ -45,6 +45,10 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
     throw new Error('Supplier search is not configured. Please contact your administrator.');
   }
 
+  // Diagnostic: log length and boundary chars to catch extra quotes/spaces without exposing secrets
+  console.log(`[SupplierIO] apiKey len=${apiKey.length} first=${JSON.stringify(apiKey[0])} last=${JSON.stringify(apiKey[apiKey.length-1])}`);
+  console.log(`[SupplierIO] customerId len=${customerId.length} first=${JSON.stringify(customerId[0])} last=${JSON.stringify(customerId[customerId.length-1])}`);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
