@@ -67,10 +67,12 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
     if (params.employee) body.employee = params.employee;
     if (params.revenue) body.revenue = params.revenue;
 
+    const bodyJson = JSON.stringify(body);
+    console.log(`[SupplierIO] sending to ${ENDPOINT}: ${bodyJson.replace(/"apiKey":"[^"]*"/, '"apiKey":"***"')}`);
     const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: bodyJson,
       signal: controller.signal,
     });
 
