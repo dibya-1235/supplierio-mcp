@@ -60,6 +60,17 @@ const BASE_URL = process.env.SUPPLIERIO_BASE_URL ?? 'https://api.supplier.io/sup
 const ENDPOINT = `${BASE_URL}/GetSearchDetail`;
 const TIMEOUT_MS = 10000;
 
+// ── Response shape from the actual API ───────────────────────────────────────
+// The API returns: { results: { Results: Supplier[], TotalRecords: "5000+" | number, ... } }
+
+interface ApiResponse {
+  results?: {
+    Results?: Supplier[];
+    TotalRecords?: string | number;
+    Error?: string | null;
+  };
+}
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 export async function searchSuppliers(params: SearchParams): Promise<SearchResult> {
@@ -75,40 +86,38 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const body: Record<string, unknown> = {
+    // The API accepts GET with query parameters (not POST with JSON body)
+    const qs = new URLSearchParams({
       apiKey,
       customerId,
       customerName,
-      rowCount: 10,
-      startRecord: 0,
+      rowCount: '10',
+      startRecord: '0',
       country: params.country ?? 'USA',
-      // Enable all enrichment flags so responses include relationships,
-      // sustainability data, and small-business classifications
-      enableRelationships: true,
-      enableDiverse: true,
-      enableSustainable: true,
-      enableSIOIdentifiedSmall: true,
-    };
+      enableRelationships: 'true',
+      enableDiverse: 'true',
+      enableSustainable: 'true',
+      enableSIOIdentifiedSmall: 'true',
+    });
 
-    // Only include optional fields if provided — omitting keeps API defaults
-    if (params.searchQuery)               body.searchQuery = params.searchQuery;
-    if (params.organizationName)          body.organizationName = params.organizationName;
-    if (params.state)                     body.state = params.state;
-    if (params.naicsCode)                 body.naicsCode = params.naicsCode;
-    if (params.sicCode)                   body.sicCode = params.sicCode;
-    if (params.diversityClassification)   body.diversityClassification = params.diversityClassification;
-    if (params.sustainabilityClassification) body.sustainabilityClassification = params.sustainabilityClassification;
-    if (params.ethnicity)                 body.ethnicity = params.ethnicity;
-    if (params.employee)                  body.employee = params.employee;
-    if (params.revenue)                   body.revenue = params.revenue;
+    // Only append optional filters when provided
+    if (params.searchQuery)                  qs.set('searchQuery', params.searchQuery);
+    if (params.organizationName)             qs.set('organizationName', params.organizationName);
+    if (params.state)                        qs.set('state', params.state);
+    if (params.naicsCode)                    qs.set('naicsCode', params.naicsCode);
+    if (params.sicCode)                      qs.set('sicCode', params.sicCode);
+    if (params.diversityClassification)      qs.set('diversityClassification', params.diversityClassification);
+    if (params.sustainabilityClassification) qs.set('sustainabilityClassification', params.sustainabilityClassification);
+    if (params.ethnicity)                    qs.set('ethnicity', params.ethnicity);
+    if (params.employee)                     qs.set('employee', params.employee);
+    if (params.revenue)                      qs.set('revenue', params.revenue);
 
-    const bodyJson = JSON.stringify(body);
-    console.log(`[SupplierIO] POST ${ENDPOINT}: ${bodyJson.replace(/"apiKey":"[^"]*"/, '"apiKey":"***"')}`);
+    const url = `${ENDPOINT}?${qs.toString()}`;
+    const maskedUrl = url.replace(/apiKey=[^&]*/, 'apiKey=***');
+    console.log(`[SupplierIO] GET ${maskedUrl}`);
 
-    const response = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: bodyJson,
+    const response = await fetch(url, {
+      method: 'GET',
       signal: controller.signal,
     });
 
@@ -118,12 +127,17 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
       throw new Error(`API_ERROR:${response.status}`);
     }
 
-    const data = await response.json() as { suppliers?: Supplier[]; totalCount?: number };
-    console.log(`[SupplierIO] OK totalCount=${data.totalCount ?? 0} suppliers=${(data.suppliers ?? []).length}`);
-    return {
-      suppliers: data.suppliers ?? [],
-      totalCount: data.totalCount ?? 0,
-    };
+    // Response shape: { results: { Results: [...], TotalRecords: "5000+" } }
+    const data = await response.json() as ApiResponse;
+    const suppliers = data.results?.Results ?? [];
+    const rawTotal = data.results?.TotalRecords;
+    // TotalRecords can be a string like "5000+" or a number
+    const totalCount = typeof rawTotal === 'number'
+      ? rawTotal
+      : parseInt(String(rawTotal ?? '0').replace(/\D/g, ''), 10) || 0;
+
+    console.log(`[SupplierIO] OK TotalRecords=${rawTotal ?? 0} suppliers=${suppliers.length}`);
+    return { suppliers, totalCount };
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw new Error('TIMEOUT');
     throw err;

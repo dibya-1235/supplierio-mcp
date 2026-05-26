@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Real API response shape: { results: { Results: [...], TotalRecords: "5000+" } }
+function makeApiResponse(suppliers: unknown[], totalRecords: string | number = suppliers.length) {
+  return JSON.stringify({ results: { Results: suppliers, TotalRecords: totalRecords, Error: null } });
+}
+
 const mockSupplier = {
   SupplierID: 'S001',
   SupplierName: 'Acme Diverse Staffing',
@@ -10,6 +15,8 @@ const mockSupplier = {
   Zip: '78701',
   Country: 'USA',
   TrustIQ: 4,
+  Diversity: null,
+  Sustainability: null,
   Relationships: null,
 };
 
@@ -28,10 +35,7 @@ describe('searchSuppliers', () => {
 
   it('returns typed suppliers on a successful API response', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ suppliers: [mockSupplier], totalCount: 1 }),
-        { status: 200 }
-      )
+      new Response(makeApiResponse([mockSupplier], 1), { status: 200 })
     );
     const { searchSuppliers } = await import('../supplierioClient.js');
     const result = await searchSuppliers({ state: 'TX', diversityClassification: 'MBE' });
@@ -40,30 +44,44 @@ describe('searchSuppliers', () => {
     expect(result.totalCount).toBe(1);
   });
 
-  it('sends rowCount 10 and defaults country to USA', async () => {
-    let capturedBody: Record<string, unknown> = {};
-    vi.spyOn(global, 'fetch').mockImplementationOnce(async (_url, init) => {
-      capturedBody = JSON.parse(init?.body as string) as Record<string, unknown>;
-      return new Response(JSON.stringify({ suppliers: [], totalCount: 0 }), { status: 200 });
+  it('sends GET request with rowCount=10 and country=USA as query params', async () => {
+    let capturedUrl = '';
+    vi.spyOn(global, 'fetch').mockImplementationOnce(async (url) => {
+      capturedUrl = url as string;
+      return new Response(makeApiResponse([]), { status: 200 });
     });
     const { searchSuppliers } = await import('../supplierioClient.js');
     await searchSuppliers({ searchQuery: 'IT' });
-    expect(capturedBody.rowCount).toBe(10);
-    expect(capturedBody.country).toBe('USA');
-    expect(capturedBody.searchQuery).toBe('IT');
-    expect(capturedBody.startRecord).toBe(0);
+    const qs = new URL(capturedUrl).searchParams;
+    expect(qs.get('rowCount')).toBe('10');
+    expect(qs.get('country')).toBe('USA');
+    expect(qs.get('searchQuery')).toBe('IT');
+    expect(qs.get('startRecord')).toBe('0');
   });
 
-  it('does not include undefined optional params in request body', async () => {
-    let capturedBody: Record<string, unknown> = {};
+  it('uses GET method (not POST)', async () => {
+    let capturedInit: RequestInit | undefined;
     vi.spyOn(global, 'fetch').mockImplementationOnce(async (_url, init) => {
-      capturedBody = JSON.parse(init?.body as string) as Record<string, unknown>;
-      return new Response(JSON.stringify({ suppliers: [], totalCount: 0 }), { status: 200 });
+      capturedInit = init;
+      return new Response(makeApiResponse([]), { status: 200 });
     });
     const { searchSuppliers } = await import('../supplierioClient.js');
     await searchSuppliers({});
-    expect(capturedBody.state).toBeUndefined();
-    expect(capturedBody.naicsCode).toBeUndefined();
+    expect(capturedInit?.method).toBe('GET');
+    expect(capturedInit?.body).toBeUndefined();
+  });
+
+  it('does not include undefined optional params in query string', async () => {
+    let capturedUrl = '';
+    vi.spyOn(global, 'fetch').mockImplementationOnce(async (url) => {
+      capturedUrl = url as string;
+      return new Response(makeApiResponse([]), { status: 200 });
+    });
+    const { searchSuppliers } = await import('../supplierioClient.js');
+    await searchSuppliers({});
+    const qs = new URL(capturedUrl).searchParams;
+    expect(qs.has('state')).toBe(false);
+    expect(qs.has('naicsCode')).toBe(false);
   });
 
   it('throws TIMEOUT on AbortError', async () => {
@@ -91,14 +109,14 @@ describe('searchSuppliers', () => {
   });
 
   it('uses caller-supplied country instead of USA default', async () => {
-    let capturedBody: Record<string, unknown> = {};
-    vi.spyOn(global, 'fetch').mockImplementationOnce(async (_url, init) => {
-      capturedBody = JSON.parse(init?.body as string) as Record<string, unknown>;
-      return new Response(JSON.stringify({ suppliers: [], totalCount: 0 }), { status: 200 });
+    let capturedUrl = '';
+    vi.spyOn(global, 'fetch').mockImplementationOnce(async (url) => {
+      capturedUrl = url as string;
+      return new Response(makeApiResponse([]), { status: 200 });
     });
     const { searchSuppliers } = await import('../supplierioClient.js');
     await searchSuppliers({ country: 'CAN' });
-    expect(capturedBody.country).toBe('CAN');
+    expect(new URL(capturedUrl).searchParams.get('country')).toBe('CAN');
   });
 
   it('returns empty suppliers and zero totalCount on empty API response', async () => {
@@ -109,5 +127,14 @@ describe('searchSuppliers', () => {
     const result = await searchSuppliers({});
     expect(result.suppliers).toEqual([]);
     expect(result.totalCount).toBe(0);
+  });
+
+  it('parses TotalRecords string like "5000+" to a number', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(makeApiResponse([mockSupplier], '5000+'), { status: 200 })
+    );
+    const { searchSuppliers } = await import('../supplierioClient.js');
+    const result = await searchSuppliers({});
+    expect(result.totalCount).toBe(5000);
   });
 });
