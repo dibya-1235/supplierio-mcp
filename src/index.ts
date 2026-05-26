@@ -42,7 +42,7 @@ if (!ADMIN_TOKEN) {
 const transports = new Map<string, StreamableHTTPServerTransport>();
 
 function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'supplierio-mcp', version: '1.0.0' });
+  const server = new McpServer({ name: 'Supplier.io', version: '1.0.0' });
   registerTools(server);
   return server;
 }
