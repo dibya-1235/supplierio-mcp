@@ -114,7 +114,7 @@ function renderSummary(params: SearchParams, totalCount: number, resultCount: nu
   ].filter((t): t is string => t !== null);
 
   return `<div class="summary">
-    <h2>SupplierOne Search Results</h2>
+    <h2>Supplier.io Search Results</h2>
     <div class="meta">Showing ${resultCount} of ${totalCount} results${tags.length ? ' &middot; ' + tags.map(t => `<span class="filter-tag">${esc(t)}</span>`).join('') : ''}</div>
   </div>`;
 }
@@ -125,7 +125,7 @@ function wrapPage(content: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>SupplierOne Results</title>
+  <title>Supplier.io Results</title>
   <style>${CSS}</style>
 </head>
 <body>${content}</body>

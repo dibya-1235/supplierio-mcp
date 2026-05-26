@@ -7,7 +7,7 @@ import { log } from '../logger.js';
 import { usernameStorage } from '../context.js';
 
 const TOOL_DESCRIPTION =
-  'Use this tool to search the SupplierOne database and discover diverse and small business suppliers. ' +
+  'Use this tool to search the Supplier.io database and discover diverse and small business suppliers. ' +
   'Supports filtering by keyword or company description, US state, NAICS industry code, SIC code, ' +
   'diversity classification (MBE, WBE, VOSB, LGBTQ+, etc.), sustainability classification, ethnicity, ' +
   'employee count range, and annual revenue range. You can also filter by exact or partial supplier name ' +
