@@ -18,8 +18,14 @@ interface AccessToken {
   expiresAt: number; // Date.now() + 90 days
 }
 
+interface ClientRegistration {
+  clientId: string;
+  redirectUris: string[];
+}
+
 const authCodes = new Map<string, AuthCode>();
 const accessTokens = new Map<string, AccessToken>();
+const clients = new Map<string, ClientRegistration>(); // Dynamic Client Registration (RFC 7591)
 
 const BASE_URL = process.env.BASE_URL ?? 'https://supplierio-mcp.onrender.com';
 
@@ -68,17 +74,43 @@ export function registerOAuthRoutes(app: express.Application): void {
     });
   });
 
-  // 1. OAuth server metadata (RFC 8414) — Claude.ai uses this for discovery
+  // 1. OAuth server metadata (RFC 8414) — Claude.ai uses this for discovery.
+  //    registration_endpoint tells claude.ai it can dynamically register as a client (RFC 7591).
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
     setCorsHeaders(res);
     res.json({
       issuer: BASE_URL,
       authorization_endpoint: `${BASE_URL}/oauth/authorize`,
       token_endpoint: `${BASE_URL}/oauth/token`,
+      registration_endpoint: `${BASE_URL}/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['none'],
     });
+  });
+
+  // 1b. Dynamic Client Registration (RFC 7591) — claude.ai calls this to get a client_id
+  //     before it can construct the authorization URL. Without this, the OAuth flow stalls.
+  app.post('/oauth/register', asyncHandler(async (req, res) => {
+    setCorsHeaders(res);
+    const body = req.body as Record<string, unknown>;
+    const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris as string[] : [];
+    const clientId = randomBytes(16).toString('hex');
+    clients.set(clientId, { clientId, redirectUris });
+    console.log(`[OAuth] client registered: ${clientId} redirect_uris=${JSON.stringify(redirectUris)}`);
+    res.status(201).json({
+      client_id: clientId,
+      redirect_uris: redirectUris,
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    });
+  }));
+
+  app.options('/oauth/register', (_req, res) => {
+    setCorsHeaders(res);
+    res.sendStatus(204);
   });
 
   // 2. Show login form
@@ -118,7 +150,12 @@ export function registerOAuthRoutes(app: express.Application): void {
       res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is not a valid URL' });
       return;
     }
-    if (parsedRedirect.protocol !== 'https:' || !['claude.ai'].includes(parsedRedirect.hostname)) {
+    const allowedHosts = ['claude.ai'];
+    const isAllowed =
+      parsedRedirect.protocol === 'https:' &&
+      allowedHosts.some(h => parsedRedirect.hostname === h || parsedRedirect.hostname.endsWith(`.${h}`));
+    if (!isAllowed) {
+      console.log(`[OAuth] rejected redirect_uri: ${params.redirectUri}`);
       res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not permitted' });
       return;
     }
