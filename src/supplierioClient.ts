@@ -40,6 +40,8 @@ export interface SearchParams {
   searchQuery?: string;
   organizationName?: string;        // filter by exact/partial supplier name
   // Geography
+  city?: string;                    // geocoded to lat/lng via Nominatim
+  locationDistance?: number;        // radius in miles around the city (default 25)
   state?: string;
   country?: string;
   // Industry
@@ -59,6 +61,36 @@ export interface SearchParams {
 const BASE_URL = process.env.SUPPLIERIO_BASE_URL ?? 'https://api.supplier.io/supplier';
 const ENDPOINT = `${BASE_URL}/GetSearchDetail`;
 const TIMEOUT_MS = 10000;
+
+// ── Geocoding ─────────────────────────────────────────────────────────────────
+// Converts a city name to "longitude,latitude" using OpenStreetMap Nominatim.
+// Free, no API key required. Returns null if the city cannot be resolved.
+
+interface NominatimResult {
+  lat: string;
+  lon: string;
+  display_name: string;
+}
+
+async function geocodeCity(city: string): Promise<string | null> {
+  try {
+    const qs = new URLSearchParams({ q: city, format: 'json', limit: '1' });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${qs}`, {
+      headers: { 'User-Agent': 'supplierio-mcp/1.0' }, // Nominatim requires a User-Agent
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as NominatimResult[];
+    if (!data.length) return null;
+    const { lon, lat } = data[0];
+    console.log(`[Geocode] "${city}" → lon=${lon} lat=${lat} (${data[0].display_name})`);
+    // API expects "longitude,latitude" format
+    return `${lon},${lat}`;
+  } catch {
+    console.warn(`[Geocode] failed to geocode "${city}"`);
+    return null;
+  }
+}
 
 // ── Response shape from the actual API ───────────────────────────────────────
 // The API returns: { results: { Results: Supplier[], TotalRecords: "5000+" | number, ... } }
@@ -99,6 +131,18 @@ export async function searchSuppliers(params: SearchParams): Promise<SearchResul
       enableSustainable: 'true',
       enableSIOIdentifiedSmall: 'true',
     });
+
+    // Geocode city → coordinates if provided
+    if (params.city) {
+      const coords = await geocodeCity(params.city);
+      if (coords) {
+        qs.set('location', coords);
+        qs.set('locationDistance', String(params.locationDistance ?? 25));
+        qs.set('locationUnit', 'miles');
+      } else {
+        console.warn(`[SupplierIO] Could not geocode city "${params.city}" — skipping location filter`);
+      }
+    }
 
     // Only append optional filters when provided
     if (params.searchQuery)                  qs.set('searchQuery', params.searchQuery);

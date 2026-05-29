@@ -102,6 +102,7 @@ function renderSummary(params: SearchParams, totalCount: number, resultCount: nu
   const tags = [
     params.searchQuery ? `Keyword: "${params.searchQuery}"` : null,
     params.organizationName ? `Name: "${params.organizationName}"` : null,
+    params.city ? `Near: ${params.city}${params.locationDistance ? ` (${params.locationDistance}mi)` : ''}` : null,
     params.state ? `State: ${params.state}` : null,
     params.naicsCode ? `NAICS: ${params.naicsCode}` : null,
     params.sicCode ? `SIC: ${params.sicCode}` : null,

@@ -8,16 +8,16 @@ import { usernameStorage } from '../context.js';
 
 const TOOL_DESCRIPTION =
   'Use this tool to search the Supplier.io database and discover diverse and small business suppliers. ' +
-  'Supports filtering by keyword or company description, US state, NAICS industry code, SIC code, ' +
-  'diversity classification (MBE, WBE, VOSB, LGBTQ+, etc.), sustainability classification, ethnicity, ' +
-  'employee count range, and annual revenue range. You can also filter by exact or partial supplier name ' +
-  'using organizationName. Returns up to 10 matching suppliers with TrustIQ scores, diversity/sustainability ' +
-  'tags, and corporate parent information. ' +
+  'Supports filtering by keyword or company description, city (searches within a radius), US state, ' +
+  'NAICS industry code, SIC code, diversity classification (MBE, WBE, VOSB, LGBTQ+, etc.), ' +
+  'sustainability classification, ethnicity, employee count range, and annual revenue range. ' +
+  'You can also filter by exact or partial supplier name using organizationName. ' +
+  'Returns up to 10 matching suppliers with TrustIQ scores, diversity/sustainability tags, and corporate parent information. ' +
   'Examples of how to map user queries to parameters: ' +
-  '"minority-owned caterers in Boston" → searchQuery="caterers", state="MA", diversityClassification="MBE"; ' +
-  '"women-owned IT staffing firms" → searchQuery="IT staffing", diversityClassification="WBE"; ' +
+  '"minority-owned caterers in Boston" → searchQuery="caterers", city="Boston", diversityClassification="MBE"; ' +
+  '"women-owned IT firms in Chicago within 10 miles" → searchQuery="IT staffing", city="Chicago", locationDistance=10, diversityClassification="WBE"; ' +
   '"veteran-owned manufacturers in Texas" → naicsCode="31-33", state="TX", diversityClassification="VOSB"; ' +
-  '"small logistics companies" → searchQuery="logistics", employee="1-50".';
+  '"small logistics companies in Houston" → searchQuery="logistics", city="Houston", employee="1-50".';
 
 const inputSchema = {
   searchQuery: z.string().optional().describe(
@@ -25,6 +25,12 @@ const inputSchema = {
   ),
   organizationName: z.string().optional().describe(
     'Filter by supplier company name (exact or partial), e.g. "Acme" or "Johnson & Johnson"'
+  ),
+  city: z.string().optional().describe(
+    'City to search near, e.g. "Boston", "Chicago", "Houston". Searches within a radius (default 25 miles).'
+  ),
+  locationDistance: z.number().optional().describe(
+    'Radius in miles around the city to search within, e.g. 10, 25, 50. Default is 25.'
   ),
   state: z.string().optional().describe(
     '2-letter US state code, e.g. "TX", "MA", "CA"'
@@ -63,6 +69,8 @@ export function registerTools(server: McpServer): void {
     const params: SearchParams = {
       searchQuery: args.searchQuery,
       organizationName: args.organizationName,
+      city: args.city,
+      locationDistance: args.locationDistance,
       state: args.state,
       country: args.country,
       naicsCode: args.naicsCode,
